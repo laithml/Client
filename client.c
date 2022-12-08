@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 int UrlToString(char *, int, char **, int *, char **);
 char* requestMsg(int , char **);
@@ -8,11 +12,31 @@ char *ArgsToString(char **, int);
 //
 int main(int argc, char *argv[]) {
        char* request=requestMsg(argc, argv);
-    printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
+//    printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
+
 
     return 0;
 }
-
+void func(int sockfd)
+{
+    char buff[1024];
+    int n;
+    for (;;) {
+        bzero(buff, sizeof(buff));
+        printf("Enter the string : ");
+        n = 0;
+        while ((buff[n++] = getchar()) != '\n')
+            ;
+        write(sockfd, buff, sizeof(buff));
+        bzero(buff, sizeof(buff));
+        read(sockfd, buff, sizeof(buff));
+        printf("From Server : %s", buff);
+        if ((strncmp(buff, "exit", 4)) == 0) {
+            printf("Client Exit...\n");
+            break;
+        }
+    }
+}
 
 char* requestMsg(int argc, char *argv[]){
     int i = 1,request_size=0;
@@ -64,13 +88,28 @@ char* requestMsg(int argc, char *argv[]){
     }else{
         strcat(type,"GET");
     }
-    args = ArgsToString(arg, argLen);
+    if(argLen>0)
+        args = ArgsToString(arg, argLen);
 
-    sprintf(request,"%s %s %s HTTP/1.1\nHost: %s",type,path,args,host);
+    sprintf(request,"%s %s%s HTTP/1.1\nHost: %s",type,path,args,host);
 
     if(parLen>0)
         sprintf(request,"%s\nContent-length: %d\n\r\n\r\n%s",request,parLen,par);
 
+    printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
+
+    ////////////////////////////////////////////////////////////////
+
+    int sockfd;
+    struct  sockaddr_in serveraddr, clientaddr;
+    sockfd = socket(AF_INET, SOCK_STREAM,0);
+    bzero(&serveraddr, sizeof(serveraddr));
+
+    serveraddr.sin_addr.s_addr= inet_addr(gethostbyname(host));
+    serveraddr.sin_port=htons(port);
+    connect(sockfd, (struct sockaddr *)&serveraddr,sizeof(serveraddr));
+
+    func(sockfd);
 
     return request;
 }
