@@ -5,7 +5,7 @@
 int UrlToString(char *, int, char **, int *, char **);
 char* requestMsg(int , char **);
 char *ArgsToString(char **, int);
-
+//
 int main(int argc, char *argv[]) {
        char* request=requestMsg(argc, argv);
     printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
