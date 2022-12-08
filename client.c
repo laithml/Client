@@ -3,17 +3,24 @@
 #include <string.h>
 
 int UrlToString(char *, int, char **, int *, char **);
-
+char* requestMsg(int , char **);
 char *ArgsToString(char **, int);
 
 int main(int argc, char *argv[]) {
-    int i = 1;
-    char *par;
-    char **arg;
-    int parLen;
-    int argLen;
+       char* request=requestMsg(argc, argv);
+    printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
+
+    return 0;
+}
+
+
+char* requestMsg(int argc, char *argv[]){
+    int i = 1,request_size=0;
+    char *par=NULL,**arg=NULL;
+    int parLen ,argLen;
     char *Url;
     while (i < argc) {
+        request_size+= strlen(argv[i]);
         if (argv[i][0] == '-') {
             int n = atoi(argv[i + 1]);
             if (n == 0 && argv[i + 1][0] != '0') {
@@ -33,6 +40,7 @@ int main(int argc, char *argv[]) {
                     for (int j = 0; j < n; j++) {
                         arg[j] = argv[i + j + 2];
                     }
+                    request_size+=n;
                     argLen = n;
                     i = i + n + 1;
                     break;
@@ -42,18 +50,29 @@ int main(int argc, char *argv[]) {
         }
         i++;
     }
-
-    char *res = ArgsToString(arg, argLen);
+    request_size+=40;
+    char *args;
     int port;
     char *host,*path;
-    UrlToString(Url, strlen(Url),&host,&port,&path);
-    printf("arg: %s\n",res);
-    printf("par: %s\n", par);
-    printf("Host: %s\n", host);
-    printf("Path: %s\n", path);
-    printf("Port: %d\n", port);
+    if(UrlToString(Url, strlen(Url),&host,&port,&path)==-1)
+        exit(EXIT_FAILURE);
 
-    return 0;
+    char *request= calloc(sizeof(char), request_size);
+    char type[5]="";
+    if(parLen > 0) {
+        strcat(type,"POST");
+    }else{
+        strcat(type,"GET");
+    }
+    args = ArgsToString(arg, argLen);
+
+    sprintf(request,"%s %s %s HTTP/1.1\nHost: %s",type,path,args,host);
+
+    if(parLen>0)
+        sprintf(request,"%s\nContent-length: %d\n\r\n\r\n%s",request,parLen,par);
+
+
+    return request;
 }
 
 char *ArgsToString(char **arg, int argLen) {
@@ -88,9 +107,13 @@ int UrlToString(char *url, int length, char **host, int *port, char **path) {
     if (strncmp("http://", url, 7) != 0)
         return -1;
     char *por = strstr(&url[6], ":");
-    *port = atoi(&por[1]);
-    if(atoi(&por[1]) ==0 && por[1]=='0')
-        *port = 80;
+
+    if(por!=NULL){
+        *port = atoi(&por[1]);
+        if(atoi(&por[1]) ==0 && por[1]=='0')
+            *port = 80;
+    }
+
     if (strstr(&url[8], "/") != NULL){
         int len=strlen(strstr(&url[8], "/"));
         *path = malloc(sizeof(char) * len + 1);
