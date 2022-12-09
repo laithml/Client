@@ -1,46 +1,26 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include <arpa/inet.h>
-#include <unistd.h>
 
 int UrlToString(char *, int, char **, int *, char **);
-char* requestMsg(int , char **);
+
 char *ArgsToString(char **, int);
-//
+
+int socket_connect(char *, int);
+
+void Request(int, char *);
+
 int main(int argc, char *argv[]) {
-       char* request=requestMsg(argc, argv);
-//    printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
-
-
-    return 0;
-}
-void func(int sockfd)
-{
-    char buff[1024];
-    for (;;) {
-        bzero(buff, sizeof(buff));
-        printf("Enter the string : ");
-        write(sockfd, buff, sizeof(buff));
-        bzero(buff, sizeof(buff));
-        read(sockfd, buff, sizeof(buff));
-        printf("From Server : %s", buff);
-        if ((strncmp(buff, "exit", 4)) == 0) {
-            printf("Client Exit...\n");
-            break;
-        }
-    }
-}
-
-char* requestMsg(int argc, char *argv[]){
-    int i = 1,request_size=0;
-    char *par=NULL,**arg=NULL;
-    int parLen ,argLen;
+    int i = 1, request_size = 0;
+    char *par = NULL, **arg = NULL;
+    int parLen = 0, argLen = 0;
     char *Url;
     while (i < argc) {
-        request_size+= strlen(argv[i]);
+        request_size += (int)strlen(argv[i]);
         if (argv[i][0] == '-') {
             int n = atoi(argv[i + 1]);
             if (n == 0 && argv[i + 1][0] != '0') {
@@ -53,14 +33,14 @@ char* requestMsg(int argc, char *argv[]){
                     strcat(par, argv[i + 2]);
                     par[n] = '\0';
                     parLen = n;
-                    i=i+2;
+                    i = i + 2;
                     break;
                 case 'r':
                     arg = (char **) malloc(sizeof(char *) * n);
                     for (int j = 0; j < n; j++) {
                         arg[j] = argv[i + j + 2];
                     }
-                    request_size+=n;
+                    request_size += n;
                     argLen = n;
                     i = i + n + 1;
                     break;
@@ -70,55 +50,77 @@ char* requestMsg(int argc, char *argv[]){
         }
         i++;
     }
-    request_size+=40;
-    char *args="";
-    int port=80;
-    char *host,*path;
-    if(UrlToString(Url, strlen(Url),&host,&port,&path)==-1)
+    request_size += 40;
+    char *args = "";
+    int port = 80;
+    char *host, *path;
+    if (UrlToString(Url, (int)strlen(Url), &host, &port, &path) == -1)
         exit(EXIT_FAILURE);
 
-    char *request= calloc(sizeof(char), request_size);
-    char type[5]="";
-    if(parLen > 0) {
-        strcat(type,"POST");
-    }else{
-        strcat(type,"GET");
+    char *request = calloc(sizeof(char), request_size);
+    char type[5] = "";
+    if (parLen > 0) {
+        strcat(type, "POST");
+    } else {
+        strcat(type, "GET");
     }
-    if(argLen>0)
+    type[strlen(type)] = '\0';
+    if (argLen > 0) {
         args = ArgsToString(arg, argLen);
-
-    sprintf(request,"%s %s%s HTTP/1.1\nHost: %s",type,path,args,host);
-
-    if(parLen>0)
-        sprintf(request,"%s\nContent-length: %d\n\r\n\r\n%s",request,parLen,par);
-
-    printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
-    sprintf(request,"HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
-
-    ////////////////////////////////////////////////////////////////
-
-    int sockfd;
-    struct  sockaddr_in serveraddr;
-    sockfd = socket(AF_INET, SOCK_STREAM,0);
-    bzero(&serveraddr, sizeof(serveraddr));
-
-    serveraddr.sin_addr.s_addr= inet_addr(gethostbyname(host));
-    serveraddr.sin_port=htons(port);
-    connect(sockfd, (struct sockaddr *)&serveraddr,sizeof(serveraddr));
+    }
+    sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\r\n\r\n", type, path, args, host);
 
 
+    if (parLen > 0)
+        sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\nContent-length: %d\n%s\r\n\r\n", type, path, args, host, parLen, par);
 
-        write(sockfd, request, strlen(request));
-        bzero(request, strlen(request));
-        read(sockfd, request, strlen(request));
-        printf("From Server : %s", request);
-        if ((strncmp(request, "exit", 4)) == 0) {
-            printf("Client Exit...\n");
 
+    printf("HTTP request =\n%s\nLEN = %d\n", request, (int)strlen(request));
+
+    int fd = socket_connect(host, port);
+    if (fd < 0)
+        exit(EXIT_FAILURE);
+
+    Request(fd, request);
+
+    return 0;
+}
+
+void Request(int fd, char *msg) {
+
+    if (write(fd, msg, strlen(msg)) < 0)
+        exit(EXIT_FAILURE);
+    char buffer[1024];
+    while (read(fd, buffer, sizeof(buffer) - 1) != 0) {
+        printf("%s", buffer);
+        bzero(buffer, sizeof(buffer));
     }
 
-    return request;
+
+    shutdown(fd, SHUT_RDWR);
+    close(fd);
 }
+
+int socket_connect(char *host, int port) {
+    int socket_fd;
+    struct sockaddr_in server_addr;
+    socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    bzero(&server_addr, sizeof(server_addr));
+    struct hostent *hp;
+    hp = gethostbyname(host);
+    server_addr.sin_addr.s_addr = ((struct in_addr *) (hp->h_addr))->s_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+
+    if (connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+        perror("connect");
+        exit(EXIT_FAILURE);
+    }
+
+    return socket_fd;
+
+}
+
 
 char *ArgsToString(char **arg, int argLen) {
     int resLen = 0;
@@ -126,7 +128,7 @@ char *ArgsToString(char **arg, int argLen) {
     char *res = NULL;
     for (int j = 0; j < argLen; ++j) {
         int i = 1;
-        resLen += strlen(arg[j]);
+        resLen += (int)strlen(arg[j]);
         while (arg[j][i] != '\0') {
             if (arg[j][i] == '=' && arg[j][i + 1] != '\0')
                 count++;
@@ -153,20 +155,20 @@ int UrlToString(char *url, int length, char **host, int *port, char **path) {
         return -1;
     char *por = strstr(&url[6], ":");
 
-    if(por!=NULL){
+    if (por != NULL) {
         *port = atoi(&por[1]);
-        if(atoi(&por[1]) ==0 && por[1]=='0')
+        if (atoi(&por[1]) == 0 && por[1] == '0')
             *port = 80;
     }
 
-    if (strstr(&url[8], "/") != NULL){
-        int len=strlen(strstr(&url[8], "/"));
+    if (strstr(&url[8], "/") != NULL) {
+        int len = (int)strlen(strstr(&url[8], "/"));
         *path = malloc(sizeof(char) * len + 1);
-        strncpy(*path,strstr(&url[8], "/"), len);
-    }else{
+        strncpy(*path, strstr(&url[8], "/"), len);
+    } else {
 
-    *path= malloc(sizeof(char) * 2);
-    strcpy(*path,"/");
+        *path = malloc(sizeof(char) * 2);
+        strcpy(*path, "/");
     }
 
     while (i < length) {
@@ -175,6 +177,6 @@ int UrlToString(char *url, int length, char **host, int *port, char **path) {
         i++;
     }
     *host = malloc(sizeof(char) * i - 7 + 1);
-    strncpy(*host,&url[7],i-7);
+    strncpy(*host, &url[7], i - 7);
     return 0;
 }
