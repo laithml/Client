@@ -20,13 +20,9 @@ int main(int argc, char *argv[]) {
 void func(int sockfd)
 {
     char buff[1024];
-    int n;
     for (;;) {
         bzero(buff, sizeof(buff));
         printf("Enter the string : ");
-        n = 0;
-        while ((buff[n++] = getchar()) != '\n')
-            ;
         write(sockfd, buff, sizeof(buff));
         bzero(buff, sizeof(buff));
         read(sockfd, buff, sizeof(buff));
@@ -75,8 +71,8 @@ char* requestMsg(int argc, char *argv[]){
         i++;
     }
     request_size+=40;
-    char *args;
-    int port;
+    char *args="";
+    int port=80;
     char *host,*path;
     if(UrlToString(Url, strlen(Url),&host,&port,&path)==-1)
         exit(EXIT_FAILURE);
@@ -97,11 +93,12 @@ char* requestMsg(int argc, char *argv[]){
         sprintf(request,"%s\nContent-length: %d\n\r\n\r\n%s",request,parLen,par);
 
     printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
+    sprintf(request,"HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
 
     ////////////////////////////////////////////////////////////////
 
     int sockfd;
-    struct  sockaddr_in serveraddr, clientaddr;
+    struct  sockaddr_in serveraddr;
     sockfd = socket(AF_INET, SOCK_STREAM,0);
     bzero(&serveraddr, sizeof(serveraddr));
 
@@ -109,7 +106,16 @@ char* requestMsg(int argc, char *argv[]){
     serveraddr.sin_port=htons(port);
     connect(sockfd, (struct sockaddr *)&serveraddr,sizeof(serveraddr));
 
-    func(sockfd);
+
+
+        write(sockfd, request, strlen(request));
+        bzero(request, strlen(request));
+        read(sockfd, request, strlen(request));
+        printf("From Server : %s", request);
+        if ((strncmp(request, "exit", 4)) == 0) {
+            printf("Client Exit...\n");
+
+    }
 
     return request;
 }
