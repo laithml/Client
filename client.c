@@ -76,6 +76,7 @@ int main(int argc, char *argv[]) {
 
 
     printf("HTTP request =\n%s\nLEN = %d\n", request, (int)strlen(request));
+//    sprintf(request,"%sConnection: close\r\n\r\n",request);
 
     int fd = socket_connect(host, port);
     if (fd < 0)
