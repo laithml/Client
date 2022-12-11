@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
+//ghjv
 void Request(int fd, char *msg) {
 
     if (write(fd, msg, strlen(msg)) < 0)
