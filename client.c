@@ -6,6 +6,9 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#define USAGE  fprintf(stderr,"Usage: client [-p n <text>] [-r n < pr1=value1 pr2=value2 ...>] <URL>\n")
+
+
 int UrlToString(char *, int, char **, int *, char **);
 
 char *ArgsToString(char **, int);
@@ -24,19 +27,28 @@ int main(int argc, char *argv[]) {
         if (argv[i][0] == '-') {
             int n = atoi(argv[i + 1]);
             if (n == 0 && argv[i + 1][0] != '0') {
-                fprintf(stderr, "Usage: %s [-h]\n", argv[0]);
+                USAGE;
                 exit(EXIT_FAILURE);
             }
             switch (argv[i][1]) {
                 case 'p':
                     par = malloc(sizeof(char) * n + 1);
+                    if (par == NULL) {
+                        fprintf(stderr, "malloc failed\n");
+                        exit(EXIT_FAILURE);
+                    }
                     strcat(par, argv[i + 2]);
                     par[n] = '\0';
                     parLen = n;
+                    request_size  += n;
                     i = i + 2;
                     break;
                 case 'r':
                     arg = (char **) malloc(sizeof(char *) * n);
+                    if (arg == NULL) {
+                        fprintf(stderr, "malloc failed\n");
+                        exit(EXIT_FAILURE);
+                    }
                     for (int j = 0; j < n; j++) {
                         arg[j] = argv[i + j + 2];
                     }
@@ -50,14 +62,20 @@ int main(int argc, char *argv[]) {
         }
         i++;
     }
-    request_size += 40;
+    if(Url == NULL){
+        USAGE;
+        exit(EXIT_FAILURE);
+    }
+    request_size += 100;
     char *args = "";
     int port = 80;
     char *host, *path;
-    if (UrlToString(Url, (int)strlen(Url), &host, &port, &path) == -1)
+    if (UrlToString(Url, (int)strlen(Url), &host, &port, &path) == -1){
+        USAGE;
         exit(EXIT_FAILURE);
+    }
 
-    char *request = calloc(sizeof(char), request_size);
+    char request[request_size];
     char type[5] = "";
     if (parLen > 0) {
         strcat(type, "POST");
@@ -68,34 +86,57 @@ int main(int argc, char *argv[]) {
     if (argLen > 0) {
         args = ArgsToString(arg, argLen);
     }
-    sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\r\n\r\n", type, path, args, host);
+    sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\r\n", type, path, args, host);
 
 
     if (parLen > 0)
-        sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\nContent-length: %d\n%s\r\n\r\n", type, path, args, host, parLen, par);
+        sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\nContent-length: %d\n%s\r\n", type, path, args, host, parLen, par);
 
+    sprintf(request,"%sConnection: close\r\n\r\n",request);
 
     printf("HTTP request =\n%s\nLEN = %d\n", request, (int)strlen(request));
-//    sprintf(request,"%sConnection: close\r\n\r\n",request);
+
+
 
     int fd = socket_connect(host, port);
-    if (fd < 0)
+    if (fd < 0){
+        perror("socket_connect");
         exit(EXIT_FAILURE);
+    }
 
     Request(fd, request);
 
+    free(args);
+    free(host);
+    free(path);
+    free(arg);
+    free(par);
+
     return 0;
 }
-//ghjv
-void Request(int fd, char *msg) {
 
-    if (write(fd, msg, strlen(msg)) < 0)
-        exit(EXIT_FAILURE);
+void Request(int fd, char *msg) {
+    int total=strlen(msg);
+    int done=0;
+    while(done!=total){
+        int r;
+        if ((r = write(fd, &msg[done], total - done)) < 0) {
+            perror("write");
+            exit(EXIT_FAILURE);
+        }
+        done += r;
+    }
+
     char buffer[1024];
-    while (read(fd, buffer, sizeof(buffer) - 1) != 0) {
+    int size=0,r;
+    bzero(buffer, sizeof(buffer));
+    while ((r=read(fd, buffer, sizeof(buffer) - 1)) != 0) {
         printf("%s", buffer);
         bzero(buffer, sizeof(buffer));
+        size += r;
     }
+
+    printf("\n Total received response bytes: %d\n",size);
 
 
     shutdown(fd, SHUT_RDWR);
@@ -105,10 +146,16 @@ void Request(int fd, char *msg) {
 int socket_connect(char *host, int port) {
     int socket_fd;
     struct sockaddr_in server_addr;
-    socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+   if( (socket_fd = socket(PF_INET, SOCK_STREAM, 0)) < 0){
+       perror("create socket failed\n");
+       exit(EXIT_FAILURE);
+   }
     bzero(&server_addr, sizeof(server_addr));
     struct hostent *hp;
-    hp = gethostbyname(host);
+    if((hp = gethostbyname(host)) == NULL){
+        herror("gethostbyname failed\n");
+        exit(EXIT_FAILURE);
+    }
     server_addr.sin_addr.s_addr = ((struct in_addr *) (hp->h_addr))->s_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
@@ -141,6 +188,10 @@ char *ArgsToString(char **arg, int argLen) {
     }
     resLen += argLen - 1;
     res = (char *) malloc(sizeof(char) * resLen + 2);
+    if(res == NULL) {
+        fprintf(stderr, "malloc failed\n");
+        exit(EXIT_FAILURE);
+    }
     strcat(res, "?");
     for (int i = 0; i < argLen; ++i) {
         strcat(res, arg[i]);
@@ -165,10 +216,18 @@ int UrlToString(char *url, int length, char **host, int *port, char **path) {
     if (strstr(&url[8], "/") != NULL) {
         int len = (int)strlen(strstr(&url[8], "/"));
         *path = malloc(sizeof(char) * len + 1);
+        if(path == NULL){
+            fprintf(stderr, "malloc failed\n");
+            exit(EXIT_FAILURE);
+        }
         strncpy(*path, strstr(&url[8], "/"), len);
     } else {
 
         *path = malloc(sizeof(char) * 2);
+        if(path == NULL) {
+            fprintf(stderr, "malloc failed\n");
+            exit(EXIT_FAILURE);
+        }
         strcpy(*path, "/");
     }
 
@@ -178,6 +237,10 @@ int UrlToString(char *url, int length, char **host, int *port, char **path) {
         i++;
     }
     *host = malloc(sizeof(char) * i - 7 + 1);
+    if(*host == NULL) {
+        fprintf(stderr, "malloc failed\n");
+        exit(EXIT_FAILURE);
+    }
     strncpy(*host, &url[7], i - 7);
     return 0;
 }
