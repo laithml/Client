@@ -32,21 +32,20 @@ int main(int argc, char *argv[]) {
             }
             switch (argv[i][1]) {
                 case 'p':
-                    par = malloc(sizeof(char) * n + 1);
+                    par = calloc(sizeof(char) , n + 1);
                     if (par == NULL) {
-                        fprintf(stderr, "malloc failed\n");
+                        fprintf(stderr, "calloc failed\n");
                         exit(EXIT_FAILURE);
                     }
-                    strcat(par, argv[i + 2]);
-                    par[n] = '\0';
+                    strncpy(par, argv[i + 2],n);
                     parLen = n;
                     request_size  += n;
                     i = i + 2;
                     break;
                 case 'r':
-                    arg = (char **) malloc(sizeof(char *) * n);
+                    arg = (char **) calloc(sizeof(char *) , n);
                     if (arg == NULL) {
-                        fprintf(stderr, "malloc failed\n");
+                        fprintf(stderr, "calloc failed\n");
                         exit(EXIT_FAILURE);
                     }
                     for (int j = 0; j < n; j++) {
@@ -69,7 +68,7 @@ int main(int argc, char *argv[]) {
     request_size += 100;
     char *args = "";
     int port = 80;
-    char *host, *path;
+    char *host=NULL, *path=NULL;
     if (UrlToString(Url, (int)strlen(Url), &host, &port, &path) == -1){
         USAGE;
         exit(EXIT_FAILURE);
@@ -92,9 +91,9 @@ int main(int argc, char *argv[]) {
     if (parLen > 0)
         sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\nContent-length: %d\n%s\r\n", type, path, args, host, parLen, par);
 
-    sprintf(request,"%sConnection: close\r\n\r\n",request);
-
     printf("HTTP request =\n%s\nLEN = %d\n", request, (int)strlen(request));
+    strcat(request,"Connection: close\r\n\r\n");
+
 
 
 
@@ -187,15 +186,16 @@ char *ArgsToString(char **arg, int argLen) {
         return res;
     }
     resLen += argLen - 1;
-    res = (char *) malloc(sizeof(char) * resLen + 2);
+    res = (char *) calloc(sizeof(char) , resLen + 1);
     if(res == NULL) {
-        fprintf(stderr, "malloc failed\n");
+        fprintf(stderr, "calloc failed\n");
         exit(EXIT_FAILURE);
     }
-    strcat(res, "?");
+    res[0]='?';
     for (int i = 0; i < argLen; ++i) {
-        strcat(res, arg[i]);
-        strcat(res, "&");
+        strncpy(res, arg[i], strlen(arg[i]));
+        if(i<argLen-1)
+            strncpy(res, "&",1);
     }
     res[resLen] = '\0';
     return res;
@@ -209,26 +209,30 @@ int UrlToString(char *url, int length, char **host, int *port, char **path) {
 
     if (por != NULL) {
         *port = atoi(&por[1]);
+        if(*port<0 || *port>65536 ){
+            USAGE;
+            exit(EXIT_FAILURE);
+        }
         if (atoi(&por[1]) == 0 && por[1] == '0')
             *port = 80;
     }
 
     if (strstr(&url[8], "/") != NULL) {
         int len = (int)strlen(strstr(&url[8], "/"));
-        *path = malloc(sizeof(char) * len + 1);
+        *path = calloc(sizeof(char) , len + 1);
         if(path == NULL){
-            fprintf(stderr, "malloc failed\n");
+            fprintf(stderr, "calloc failed\n");
             exit(EXIT_FAILURE);
         }
         strncpy(*path, strstr(&url[8], "/"), len);
     } else {
 
-        *path = malloc(sizeof(char) * 2);
+        *path = calloc(sizeof(char) , 2);
         if(path == NULL) {
-            fprintf(stderr, "malloc failed\n");
+            fprintf(stderr, "calloc failed\n");
             exit(EXIT_FAILURE);
         }
-        strcpy(*path, "/");
+        strncpy(*path, "/",1);
     }
 
     while (i < length) {
@@ -236,9 +240,9 @@ int UrlToString(char *url, int length, char **host, int *port, char **path) {
             break;
         i++;
     }
-    *host = malloc(sizeof(char) * i - 7 + 1);
+        *host = calloc(sizeof(char) ,i - 7 + 1);
     if(*host == NULL) {
-        fprintf(stderr, "malloc failed\n");
+        fprintf(stderr, "calloc failed\n");
         exit(EXIT_FAILURE);
     }
     strncpy(*host, &url[7], i - 7);
