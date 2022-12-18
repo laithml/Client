@@ -1,0 +1,25 @@
+ID: 211353297
+Author: Laith Muhtaseb, ID: 211353297
+EX2 – HTTP client
+files: client.c and README.
+
+Description
+This program is a command line utility for sending HTTP requests to a server. It supports both GET and POST requests,
+and allows the user to specify query string arguments and a request body for POST requests.
+
+Usage
+client [-p n <text>] [-r n < pr1=value1 pr2=value2 ...>] <URL>
+
+Options
+-p n <text>: Use a POST request and include the specified text as the request body. n is the number of characters in the text.
+-r n <pr1=value1 pr2=value2 ...>: Use a GET request and include the specified query string arguments in the request. n is the number of arguments.
+<URL>: The URL to send the request to.
+
+
+Examples
+
+Send a GET request to https://www.example.com/path?arg1=value1&arg2=value2:
+client -r 2 arg1=value1 arg2=value2 https://www.example.com/path
+
+Send a POST request to https://www.example.com/path with the request body "request body":
+client -p 11 "request body" https://www.example.com/path
