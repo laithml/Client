@@ -134,18 +134,16 @@ int main(int argc, char *argv[]) {
     }
 
     // Construct HTTP request
-    sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\r\n", type, path, args, host);
+    sprintf(request, "%s %s%s HTTP/1.0\r\nHost: %s\r\n\r\n", type, path, args, host);
 
     // Add POST request body to HTTP request, if provided
     if (parLen > 0) {
-        sprintf(request, "%s %s%s HTTP/1.1\r\nHost: %s\nContent-length: %d\n%s\r\n", type, path, args, host, parLen, par);
+        sprintf(request, "%s %s%s HTTP/1.0\r\nHost: %s\nContent-length: %d\r\n\r\n%s", type, path, args, host, parLen, par);
     }
 
     // Print HTTP request for debugging purposes
     printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
 
-    // Add "Connection: close" header to HTTP request
-    strcat(request,"Connection: close\r\n\r\n");
 
     // Connect to server
     int fd = socket_connect(host, port);
@@ -264,7 +262,7 @@ char *ArgsToString(char **arg, int argLen) {
     }
 
     // Allocate memory for the resulting string
-    resLen += argLen - 1;
+    resLen += argLen ;
     res = (char *) calloc(sizeof(char) , resLen + 1);
     if(res == NULL) {
         fprintf(stderr, "calloc failed\n");
@@ -274,9 +272,9 @@ char *ArgsToString(char **arg, int argLen) {
     // Concatenate the arguments into the resulting string
     res[0]='?';
     for (int i = 0; i < argLen; ++i) {
-        strncpy(res, arg[i], strlen(arg[i]));
+        strncat(res, arg[i], strlen(arg[i]));
         if(i<argLen-1)
-            strncpy(res, "&",1);
+            strncat(res, "&",1);
     }
     res[resLen] = '\0';
 
