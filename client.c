@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
 
 
 
-
+// C
 void Request(int fd, char *msg) {
     // Calculate total number of bytes to be written
     int total=strlen(msg);
