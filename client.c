@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#define USAGE  fprintf(stderr,"Usage: client [-p n <text>] [-r n < pr1=value1 pr2=value2 ...>] <URL>\n")
+#define USAGE  printf("Usage: client [-p n <text>] [-r n < pr1=value1 pr2=value2 ...>] <URL>\n")
 
 
 int UrlToString(char *, int, char **, int *, char **);
@@ -21,7 +21,7 @@ void freeAllocated(char *args,char *host,char *path,char **arg,char *par){
     // Free allocated memory
     if(args!=NULL){
         if(strcmp(args,"")!= 0)
-             free(args);
+            free(args);
     }
     if(host!=NULL)
         free(host);
@@ -138,11 +138,11 @@ int main(int argc, char *argv[]) {
 
     // Add POST request body to HTTP request, if provided
     if (parLen > 0) {
-        sprintf(request, "%s %s%s HTTP/1.0\r\nHost: %s\nContent-length: %d\r\n\r\n%s", type, path, args, host, parLen, par);
+        sprintf(request, "%s %s%s HTTP/1.0\r\nHost: %s\r\nContent-length: %d\r\n\r\n%s", type, path, args, host, parLen, par);
     }
 
     // Print HTTP request for debugging purposes
-    printf("HTTP request =\n%s\nLEN = %d\n", request, strlen(request));
+    printf("HTTP request =\n%s\nLEN = %d\n", request, (int)strlen(request));
 
 
     // Connect to server
@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
 // C
 void Request(int fd, char *msg) {
     // Calculate total number of bytes to be written
-    int total=strlen(msg);
+    int total=(int)strlen(msg);
 
     // Keep track of number of bytes written
     int done=0;
@@ -181,12 +181,16 @@ void Request(int fd, char *msg) {
     }
 
     // Read from the socket into a buffer
-    char buffer[1024];
+    unsigned char buffer[1024];
     int size=0,r;
     bzero(buffer, sizeof(buffer));
     while ((r=read(fd, buffer, sizeof(buffer) - 1)) != 0) {
         // Print the received message
-        printf("%s", buffer);
+        int n=0;
+        while(n!=r){
+            printf("%c",buffer[n]);
+            n++;
+        }
         bzero(buffer, sizeof(buffer));
         size += r;
     }
